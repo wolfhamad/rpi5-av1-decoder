@@ -3,15 +3,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 static void print_usage(const char *argv0) {
     fprintf(stderr,
             "Usage: %s <input.av1> [output_dir]\n"
             "\n"
             "CPU-only AV1 decode benchmarking for Raspberry Pi 5 (BCM2712)\n"
-            "This project is intentionally focused on software decode because the\n"
-            "VideoCore VII path has no public AV1 hardware decode support.\n"
+            "This project is focused on software decode because VideoCore VII\n"
+            "does not expose a stable public AV1 hardware decode path for a\n"
+            "VA-API / V4L2 bridge on Raspberry Pi OS.\n"
             "\n",
             argv0);
 }

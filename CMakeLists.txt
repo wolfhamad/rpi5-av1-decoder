@@ -1,51 +1,47 @@
-cmake_minimum_required(VERSION 3.16)
+#include "av1_decoder.h"
 
-project(rpi5_av1_decoder LANGUAGES C)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+static void print_usage(const char *argv0) {
+    fprintf(stderr,
+            "Usage: %s <input.av1> [output_dir]\n"
+            "\n"
+            "CPU-only AV1 decode benchmarking for Raspberry Pi 5 (BCM2712)\n"
+            "This project is focused on software decode because VideoCore VII\n"
+            "does not expose a stable public AV1 hardware decode path for a\n"
+            "VA-API / V4L2 bridge on Raspberry Pi OS.\n"
+            "\n",
+            argv0);
+}
 
-option(RPI5_AV1_USE_LOCAL_FFMPEG "Build against a local FFmpeg installation" OFF)
+int main(int argc, char **argv) {
+    if (argc < 2 || argc > 3) {
+        print_usage(argv[0]);
+        return 1;
+    }
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
-    add_compile_options(-O3 -Wall -Wextra -Wpedantic)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
-        add_compile_options(-mcpu=native)
-    endif()
-endif()
+    const char *input_path = argv[1];
+    const char *output_dir = (argc == 3) ? argv[2] : "./output";
 
-find_package(PkgConfig REQUIRED)
+    decode_stats_t stats = {0};
 
-# Prefer libdav1d / FFmpeg on Raspberry Pi 5.
-# This project is CPU-only: AV1 hardware decode is not available through
-# the VideoCore VII pipeline on Raspberry Pi OS / BCM2712 at present.
-if(RPI5_AV1_USE_LOCAL_FFMPEG)
-    find_package(FFMPEG REQUIRED)
-    set(FFMPEG_LIBS ${FFMPEG_LIBRARIES})
-    include_directories(${FFMPEG_INCLUDE_DIRS})
-else()
-    pkg_check_modules(AVCODEC REQUIRED IMPORTED_TARGET libavcodec)
-    pkg_check_modules(AVFORMAT REQUIRED IMPORTED_TARGET libavformat)
-    pkg_check_modules(AVUTIL REQUIRED IMPORTED_TARGET libavutil)
-    pkg_check_modules(DAV1D REQUIRED IMPORTED_TARGET dav1d)
-    set(FFMPEG_LIBS
-        PkgConfig::AVCODEC
-        PkgConfig::AVFORMAT
-        PkgConfig::AVUTIL
-        PkgConfig::DAV1D
-    )
-endif()
+    printf("Raspberry Pi 5 AV1 decoder (CPU path)\n");
+    printf("Input: %s\n", input_path);
+    printf("Output: %s\n", output_dir);
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+    int ret = decode_av1_file(input_path, output_dir, &stats);
+    if (ret < 0) {
+        fprintf(stderr, "Decode failed\n");
+        return 2;
+    }
 
-add_executable(rpi5_av1_decoder
-    src/main.c
-    src/av1_decoder.c
-)
-
-target_link_libraries(rpi5_av1_decoder PRIVATE ${FFMPEG_LIBS})
-
-target_include_directories(rpi5_av1_decoder PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+    printf("Decode finished successfully\n");
+    printf("Frames decoded: %d\n", stats.frame_count);
+    printf("Resolution: %dx%d\n", stats.width, stats.height);
+    printf("Bit depth: %d\n", stats.bit_depth);
+    printf("Decode time: %.2f ms\n", stats.decode_ms);
+    printf("Bytes emitted (decoded image payload): %llu\n", (unsigned long long)stats.total_bytes);
+    return 0;
+}
